@@ -4,17 +4,19 @@
 ## How to use ?
 ```
 go build
-./mqtest
+./mqtest -mq mqtt
 ``` 
 
 ## args
 ```
--broker string
-        broker addr (default "tcp://127.0.0.1:1883")
+  -broker string
+        broker addr (default "127.0.0.1:1883")
   -itime int
         pub sleep time(ms) (default 300)
   -log string
         path/to/roll.log
+  -mq string
+        nats/nsq/kafka/rabbitmq/redis/mqtt (default "mqtt")
   -pprof string
         address:port (default ":0")
   -pub int

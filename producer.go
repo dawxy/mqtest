@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/micro/go-micro/broker"
-	"github.com/micro/go-plugins/broker/mqtt"
 	"github.com/vizee/echo"
 )
 
 func Puber(topic string, itime time.Duration) {
-	client := mqtt.NewBroker(broker.Addrs(optBroker))
+	defer wg.Done()
+	client := NewBroker(broker.Addrs(optBroker))
 	if err := client.Init(); err != nil {
 		echo.Error("Broker init error", echo.Errval(err))
 		return
@@ -20,10 +20,7 @@ func Puber(topic string, itime time.Duration) {
 		echo.Error("Broker Connect error", echo.Errval(err))
 		return
 	}
-	defer func() {
-		client.Disconnect()
-		wg.Done()
-	}()
+	defer client.Disconnect()
 	for {
 		tp := topic
 		if optRandTopic {

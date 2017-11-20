@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/micro/go-micro/broker"
+	"github.com/micro/go-micro/cmd"
+	_ "github.com/micro/go-plugins/broker/kafka"
 	_ "github.com/micro/go-plugins/broker/mqtt"
-	// _ "github.com/micro/go-plugins/broker/kafka"
 	_ "github.com/micro/go-plugins/broker/nats"
-	// _ "github.com/micro/go-plugins/broker/nsq"
-	// _ "github.com/micro/go-plugins/broker/rabbitmq"
+	_ "github.com/micro/go-plugins/broker/nsq"
+	_ "github.com/micro/go-plugins/broker/rabbitmq"
+	_ "github.com/micro/go-plugins/broker/redis"
 	"github.com/shouyingo/logwriter"
 	"github.com/vizee/echo"
 )
@@ -37,6 +39,7 @@ var (
 	optTopicNum  int
 	pprofAddr    string
 	optBroker    string
+	NewBroker    func(...broker.Option) broker.Broker
 )
 
 func onServiceStat(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +75,7 @@ func main() {
 		optSubNum int
 		optItime  int64
 		optPubNum int
+		optMq     string
 	)
 
 	flag.StringVar(&optLog, "log", "", "path/to/roll.log")
@@ -80,16 +84,23 @@ func main() {
 	flag.IntVar(&optPubNum, "pub", 1, "pub num")
 	flag.IntVar(&optTopicNum, "topic", 1, "topic num (only randtopic=true)")
 	flag.Int64Var(&optItime, "itime", 300, "pub sleep time(ms)")
-	flag.StringVar(&optBroker, "broker", "tcp://127.0.0.1:1883", "broker addr")
+	flag.StringVar(&optBroker, "broker", "127.0.0.1:1883", "broker addr")
 	flag.StringVar(&pprofAddr, "pprof", ":0", "address:port")
+	flag.StringVar(&optMq, "mq", "mqtt", "nats/nsq/kafka/rabbitmq/redis/mqtt")
 
 	flag.Parse()
+	NewBroker = cmd.DefaultBrokers[optMq]
+	if NewBroker == nil {
+		echo.Error("not support", echo.String("mq", optMq))
+		return
+	}
 	if optLog != "" {
 		echo.SetOutput(logwriter.New(optLog, 256*1024*1024, 32))
 	}
 	if pprofAddr != "" {
 		go startPprof()
 	}
+
 	echo.Info("start", echo.Int("sub num", optSubNum), echo.Int("pub num", optPubNum), echo.String("broker addr", optBroker))
 	go func() {
 		ti := time.NewTicker(time.Second)
@@ -98,8 +109,9 @@ func main() {
 			tmpqps := qps
 			tmpsum := sum
 			mu.Unlock()
-			if tmpqps == 0 {
-				tmpqps = 1
+			avg := int64(0)
+			if tmpqps > 0 {
+				avg = tmpsum / tmpqps
 			}
 
 			echo.Info(
@@ -107,7 +119,7 @@ func main() {
 				echo.Int64("qps", tmpqps),
 				echo.Stringer("\tmin", time.Duration(atomic.LoadInt64(&min))),
 				echo.Stringer("\tmax", time.Duration(atomic.LoadInt64(&max))),
-				echo.Int64("\tavg(ms)", tmpsum/tmpqps),
+				echo.Int64("\tavg(ms)", avg),
 			)
 			atomic.StoreInt64(&min, math.MaxInt64)
 			atomic.StoreInt64(&max, 0)
@@ -118,7 +130,7 @@ func main() {
 		}
 	}()
 
-	topic := "test/mqtt"
+	topic := "test-mq"
 	var clients []broker.Broker
 	for i := 0; i < optSubNum; i++ {
 		// cOpts.SetClientID(fmt.Sprintf("sub_%d", i))

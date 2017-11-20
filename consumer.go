@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/micro/go-micro/broker"
-	"github.com/micro/go-plugins/broker/mqtt"
 	"github.com/vizee/echo"
 )
 
@@ -38,7 +37,7 @@ func sub(client broker.Broker, topic string) (suber broker.Subscriber, err error
 }
 
 func Suber(topic string) broker.Broker {
-	client := mqtt.NewBroker(broker.Addrs(optBroker))
+	client := NewBroker(broker.Addrs(optBroker))
 	if err := client.Init(); err != nil {
 		echo.Error("Broker init error", echo.Errval(err))
 		return nil
